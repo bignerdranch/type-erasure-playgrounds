@@ -1,16 +1,18 @@
+//Sources:
+
 // Intro
-// https://realm.io/news/tryswift-gwendolyn-weston-type-erasure/
-// http://robnapier.net/erasure
-// http://www.russbishop.net/type-erasure
+//https://realm.io/news/tryswift-gwendolyn-weston-type-erasure/
+//http://robnapier.net/erasure
+//http://www.russbishop.net/type-erasure
 
 // Std Lib implementation technique
-// https://realm.io/news/type-erased-wrappers-in-swift/
-// http://robnapier.net/type-erasure-in-stdlib
+//https://realm.io/news/type-erased-wrappers-in-swift/
+//http://robnapier.net/type-erasure-in-stdlib
+//http://www.russbishop.net/inception
 
 // Associated Types
-// http://www.russbishop.net/swift-associated-types
-
-// http://krakendev.io/blog/generic-protocols-and-their-shortcomings
+//http://www.russbishop.net/swift-associated-types
+//http://krakendev.io/blog/generic-protocols-and-their-shortcomings
 // > In programming there is a concept known as a thunk (https://en.wikipedia.org/wiki/Thunk) that can help us out with this particular shortcoming! A thunk is a helper struct/class that forwards calls from one object to another object. This is useful for scenarios where those two objects can't normally talk to one another. Using this, we can effectively erase our abstract generic protocol types in favor of another concrete, more fully-fledged type. This is often referred to as type erasure.
 
 import UIKit
@@ -106,9 +108,7 @@ if let firstCell = cells.first {
 // Heterogenous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional.
 //let objectiveCDaze = [AnyDetailRow(FileCell()), AnyDetailRow(FolderCell())]
 
-fileprivate class _AnyDetailRowBase<Model>: DetailRow {
-    internal var sizeLabelText: String = ""
-
+class _AnyDetailRowBase<Model>: DetailRow {
     init() {
         guard type(of: self) != _AnyDetailRowBase.self else {
             fatalError("_AnyDetailRowBase<Model> instances can not be created; create a subclass instance instead")
@@ -117,20 +117,38 @@ fileprivate class _AnyDetailRowBase<Model>: DetailRow {
     func configure(model: Model) {
         fatalError("Must override")
     }
+    var sizeLabelText: String {
+        get { return "" }
+        set {}
+    }
 }
 
-fileprivate final class _AnyDetailRowBox<Base: DetailRow>: _AnyDetailRowBase<Base.Model> {
-    var base: Base
-    init(_ base: Base) {
-        self.base = base
+final class _AnyDetailRowBox<Concrete: DetailRow>: _AnyDetailRowBase<Concrete.Model> {
+    var concrete: Concrete
+    init(_ concrete: Concrete) {
+        self.concrete = concrete
     }
-    override func configure(model: Base.Model) {
-        base.configure(model: model)
+    override func configure(model: Concrete.Model) {
+        concrete.configure(model: model)
+    }
+    override var sizeLabelText: String {
+        get {
+            return concrete.sizeLabelText
+        }
+        set {
+            concrete.sizeLabelText = newValue
+        }
     }
 }
 
 final class ImprovedAnyDetailRow<Model>: DetailRow {
     private let box: _AnyDetailRowBase<Model>
+    init<Concrete: DetailRow>(_ concrete: Concrete) where Concrete.Model == Model {
+        box = _AnyDetailRowBox(concrete)
+    }
+    func configure(model: Model) {
+        box.configure(model: model)
+    }
     var sizeLabelText: String {
         get {
             return box.sizeLabelText
@@ -138,13 +156,6 @@ final class ImprovedAnyDetailRow<Model>: DetailRow {
         set {
             box.sizeLabelText = newValue
         }
-    }
-
-    init<Base: DetailRow>(_ base: Base) where Base.Model == Model {
-        box = _AnyDetailRowBox(base)
-    }
-    func configure(model: Model) {
-        box.configure(model: model)
     }
 }
 
@@ -155,4 +166,8 @@ let randomCell = (arc4random() % 2 == 0) ? ImprovedAnyDetailRow(DetailFileCell()
 randomCell.sizeLabelText = "1TB"
 print("\(randomCell.sizeLabelText)")
 
+let myTest = DetailFileCell()
+let wrapped = ImprovedAnyDetailRow(myTest)
+myTest.sizeLabelText = "Test"
+print("\(myTest.sizeLabelText) = \(wrapped.sizeLabelText)")
 
