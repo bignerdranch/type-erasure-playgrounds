@@ -118,8 +118,8 @@ class _AnyDetailRowBase<Model>: DetailRow {
         fatalError("Must override")
     }
     var sizeLabelText: String {
-        get { return "" }
-        set {}
+        get { fatalError("Must override") }
+        set { fatalError("Must override") }
     }
 }
 
