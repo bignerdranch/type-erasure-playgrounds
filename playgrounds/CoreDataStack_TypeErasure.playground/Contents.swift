@@ -104,14 +104,14 @@ private class BaseEntityMonitorDelegate<T: NSManagedObject>: NSObject where T: C
         NotificationCenter.default.removeObserver(self)
     }
 
-    @objc final func evaluateChangeNotification(_ notification: NSNotification) {
-        guard let changeSet = notification.userInfo as? [AnyHashable: NSSet] else {
+    @objc final func evaluateChangeNotification(_ notification: Notification) {
+        guard let changeSet = (notification as NSNotification).userInfo else {
             return
         }
 
         owner.context.performAndWait { [predicate = owner.combinedPredicate] in
-            func process(_ managedObjects: NSSet?) -> EntitySet {
-                return managedObjects.flatMap() { $0.filtered(using: predicate) as? EntitySet } ?? EntitySet()
+            func process(_ value: Any?) -> EntitySet {
+                return (value as? NSSet)?.filtered(using: predicate) as? EntitySet ?? []
             }
 
             let inserted = process(changeSet[NSInsertedObjectsKey])
