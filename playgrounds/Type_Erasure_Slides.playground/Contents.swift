@@ -17,7 +17,7 @@
 
 import UIKit
 
-protocol DetailRow: class {
+protocol Row: class {
     associatedtype Model
     var sizeLabelText: String { get set }
     func configure(model: Model)
@@ -26,21 +26,21 @@ protocol DetailRow: class {
 struct Folder {}
 struct File {}
 
-class FolderCell: DetailRow {
+class FolderCell: Row {
     typealias Model = Folder
     var sizeLabelText: String = ""
     func configure(model: Folder) {
         print("Configured a \(type(of: self))")
     }
 }
-class FileCell: DetailRow {
+class FileCell: Row {
     typealias Model = File
     var sizeLabelText: String = ""
     func configure(model: File) {
         print("Configured a \(type(of: self))")
     }
 }
-class DetailFileCell: DetailRow {
+class DetailFileCell: Row {
     typealias Model = File
     var sizeLabelText: String = ""
     func configure(model: File) {
@@ -48,21 +48,34 @@ class DetailFileCell: DetailRow {
     }
 }
 
-// error: protocol 'DetailRow' can only be used as a generic constraint because it has Self or associated type requirements
-//let cells: [DetailRow] = [FileCell(), FolderCell()]
-//let randomFileCell: DetailRow = (arc4random() % 2 == 0) ? FileCell() : DetailFileCell()
+// error: protocol 'Row' can only be used as a generic constraint because it has Self or associated type requirements
+
+//let cells: [Row] = [FileCell(), FolderCell()]
+//let randomFileCell: Row = (arc4random() % 2 == 0) ? FileCell() : DetailFileCell()
+//func resize(row: Row) {
+//
+//}
+
+// How Generics handle this
+struct MyRow<T> {
+    var sizeLabelText: String = ""
+    func configure(model: T) {
+        print("Configured a \(type(of: self))")
+    }
+}
+let myRowStructs: [MyRow<File>] = [MyRow<File>(), MyRow<File>()]
 
 // Cannot specialize non-generic type
-//let cells: DetailRow<File> = [FileCell(), DetailFileCell()]
+//let cells: Row<File> = [FileCell(), DetailFileCell()]
 
 // Protocols do not allow generic parameters
-//protocol DetailRow<Model> {
+//protocol Row<Model> {
 //    func configure(model: Model)
 //}
 
 // Closure example
 // Type erasure to the rescue
-class AnyDetailRow<Model>: DetailRow {
+class AnyRow<Model>: Row {
     private let _configure: (Model) -> Void
 
     private let _getSize: () -> String
@@ -77,7 +90,7 @@ class AnyDetailRow<Model>: DetailRow {
         }
     }
 
-    init<Concrete: DetailRow>(_ concrete: Concrete) where Model == Concrete.Model {
+    init<Concrete: Row>(_ concrete: Concrete) where Model == Concrete.Model {
         _configure = concrete.configure
         _setSize = concrete.setSize
         _getSize = concrete.getSize
@@ -88,7 +101,7 @@ class AnyDetailRow<Model>: DetailRow {
     }
 }
 
-extension DetailRow {
+extension Row {
     func getSize() -> String {
         return sizeLabelText
     }
@@ -97,7 +110,7 @@ extension DetailRow {
     }
 }
 
-let cells: [AnyDetailRow<File>] = [AnyDetailRow(FileCell()), AnyDetailRow(DetailFileCell())]
+let cells: [AnyRow<File>] = [AnyRow(FileCell()), AnyRow(DetailFileCell())]
 cells.map() { $0.configure(model: File()) }
 
 if let firstCell = cells.first {
@@ -106,12 +119,12 @@ if let firstCell = cells.first {
 }
 
 // Heterogenous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional.
-//let objectiveCDaze = [AnyDetailRow(FileCell()), AnyDetailRow(FolderCell())]
+//let objectiveCDaze = [AnyRow(FileCell()), AnyRow(FolderCell())]
 
-class _AnyDetailRowBase<Model>: DetailRow {
+private class _AnyRowBase<Model>: Row {
     init() {
-        guard type(of: self) != _AnyDetailRowBase.self else {
-            fatalError("_AnyDetailRowBase<Model> instances can not be created; create a subclass instance instead")
+        guard type(of: self) != _AnyRowBase.self else {
+            fatalError("_AnyRowBase<Model> instances can not be created; create a subclass instance instead")
         }
     }
     func configure(model: Model) {
@@ -123,7 +136,7 @@ class _AnyDetailRowBase<Model>: DetailRow {
     }
 }
 
-final class _AnyDetailRowBox<Concrete: DetailRow>: _AnyDetailRowBase<Concrete.Model> {
+private final class _AnyRowBox<Concrete: Row>: _AnyRowBase<Concrete.Model> {
     var concrete: Concrete
     init(_ concrete: Concrete) {
         self.concrete = concrete
@@ -141,10 +154,10 @@ final class _AnyDetailRowBox<Concrete: DetailRow>: _AnyDetailRowBase<Concrete.Mo
     }
 }
 
-final class ImprovedAnyDetailRow<Model>: DetailRow {
-    private let box: _AnyDetailRowBase<Model>
-    init<Concrete: DetailRow>(_ concrete: Concrete) where Concrete.Model == Model {
-        box = _AnyDetailRowBox(concrete)
+final class ImprovedAnyRow<Model>: Row {
+    private let box: _AnyRowBase<Model>
+    init<Concrete: Row>(_ concrete: Concrete) where Concrete.Model == Model {
+        box = _AnyRowBox(concrete)
     }
     func configure(model: Model) {
         box.configure(model: model)
@@ -159,15 +172,15 @@ final class ImprovedAnyDetailRow<Model>: DetailRow {
     }
 }
 
-let improvedCells = [ImprovedAnyDetailRow(FileCell()), ImprovedAnyDetailRow(DetailFileCell())]
+let improvedCells = [ImprovedAnyRow(FileCell()), ImprovedAnyRow(DetailFileCell())]
 improvedCells.map() { $0.configure(model: File()) }
 
-let randomCell = (arc4random() % 2 == 0) ? ImprovedAnyDetailRow(DetailFileCell()) : ImprovedAnyDetailRow(FileCell())
+let randomCell = (arc4random() % 2 == 0) ? ImprovedAnyRow(DetailFileCell()) : ImprovedAnyRow(FileCell())
 randomCell.sizeLabelText = "1TB"
 print("\(randomCell.sizeLabelText)")
 
 let myTest = DetailFileCell()
-let wrapped = ImprovedAnyDetailRow(myTest)
+let wrapped = ImprovedAnyRow(myTest)
 myTest.sizeLabelText = "Test"
 print("\(myTest.sizeLabelText) = \(wrapped.sizeLabelText)")
 
